@@ -1,5 +1,5 @@
 // Cache do aplicativo para uso offline. Mude VERSAO ao publicar uma atualização.
-const VERSAO = 'lume-guia-v11';
+const VERSAO = 'lume-guia-v12';
 const CASCA = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/logo.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 const FONTES = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 

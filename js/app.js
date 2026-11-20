@@ -84,7 +84,7 @@ const TEMAS0 = [['Jesus', ['Cristo', 'Messias']], ['Deus', []], ['Estrela', ['Es
 /* =============== dados =============== */
 const KEY = 'cerebro.v1';
 let DB = null, saveT = 0;
-const cfg0 = () => ({ estilo: 'vidro', paleta: 1, escuro: true, esc: 'auto', txt: 1, contr: 1, caixa: 80, fonte: 'serif', sync: { repo: '', token: '', branch: 'main', path: 'cerebro-dados.json', ultima: '' } });
+const cfg0 = () => ({ estilo: 'vidro', paleta: 1, escuro: true, esc: 'auto', auto: 1, txt: 1, contr: 1, caixa: 80, fonte: 'serif', sync: { repo: '', token: '', branch: 'main', path: 'cerebro-dados.json', ultima: '' } });
 
 function mkDB(seed) {
   const t = now();
@@ -100,6 +100,7 @@ function save() {
   DB.atualizado = now();
   clearTimeout(saveT);
   saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { toast('Não consegui salvar no aparelho'); } }, 150);
+  agendarSync();
 }
 async function boot() {
   try { const r = localStorage.getItem(KEY); if (r) DB = JSON.parse(r); } catch (e) { DB = null; }
@@ -112,7 +113,7 @@ async function boot() {
   }
   DB.cfg = Object.assign(cfg0(), DB.cfg || {}); DB.cfg.sync = Object.assign(cfg0().sync, DB.cfg.sync || {});
   DB.apagadas = DB.apagadas || {}; DB.ts = DB.ts || { catalogo: now(), temas: now() };
-  aplicar(); montar(); render();
+  aplicar(); montar(); render(); agendarSync(1500);
 }
 
 /* =============== tema visual =============== */
@@ -213,7 +214,7 @@ function menus(r) {
   <nav class="nav">${ROTAS.map(([p, i, t]) => `<a href="#/${p}" class="${on(p) ? 'on' : ''}"><span class="tile">${ic(i, 18)}</span>${t}${p === 'notas' ? `<span class="cnt">${DB.notas.length}</span>` : ''}</a>`).join('')}</nav>
   <div class="nlab">Sistema</div>
   <nav class="nav"><a href="#/config" class="${r.p === 'config' ? 'on' : ''}"><span class="tile">${ic('gear', 18)}</span>Configurações</a></nav>
-  <div class="sfoot"><div><span class="dot ${navigator.onLine ? '' : 'off'}"></span>${navigator.onLine ? 'Online' : 'Offline, tudo salvo no aparelho'}</div><div>${DB.cfg.sync.ultima ? 'Sincronizado ' + fmtD(DB.cfg.sync.ultima) : 'Sem sincronização'}</div></div>`;
+  <div class="sfoot"><div><span class="dot ${navigator.onLine ? '' : 'off'}"></span>${navigator.onLine ? 'Online' : 'Offline, tudo salvo no aparelho'}</div><div id="sfstat">${esc(S.syncMsg || (DB.cfg.sync.ultima ? 'Sincronizado ' + fmtD(DB.cfg.sync.ultima) : 'Sem sincronização'))}</div></div>`;
   $('#tabbar').innerHTML = [['inicio', 'home', 'Início'], ['notas', 'notes', 'Notas']].map(([p, i, t]) => `<a href="#/${p}" class="${on(p) ? 'on' : ''}">${ic(i, 22)}${t}</a>`).join('')
     + `<button class="plus" data-act="nova" aria-label="Nova nota"><span class="pb">${ic('plus', 24)}</span></button>`
     + [['rede', 'net', 'Rede'], ['catalogo', 'list', 'Catálogo']].map(([p, i, t]) => `<a href="#/${p}" class="${on(p) ? 'on' : ''}">${ic(i, 22)}${t}</a>`).join('');
@@ -334,7 +335,7 @@ const ctxDe = id => id === 'qc' ? 'cat' : id === 'qlink' ? 'link' : (id === 'qn'
 
 /* =============== editor =============== */
 function modal(html) { fecharSug(); $('#modal').innerHTML = `<div class="modal" data-act="fundo"><div class="modal-box" role="dialog" aria-modal="true">${html}</div></div>`; }
-const fechar = () => { $('#modal').innerHTML = ''; };
+const fechar = () => { $('#modal').innerHTML = ''; if (S.pendRender) { S.pendRender = false; setTimeout(render, 0); } };
 function toast(m) { const t = $('#toast'); t.innerHTML = `<div class="toast" role="status">${esc(m)}</div>`; clearTimeout(toast.t); toast.t = setTimeout(() => t.innerHTML = '', 2800); }
 function temaBloco(n) {
   const modo = n.temaModo || 'auto', atual = n.id ? temasDe(n) : [], marc = new Set(modo === 'manual' ? (n.temas || []) : atual);
@@ -506,6 +507,7 @@ function vConfig() {
     <section class="sec"><h3>Sincronização com o GitHub</h3><div class="card"><p class="hint" style="margin-bottom:14px">Guarda um arquivo no seu repositório privado e mantém seus aparelhos iguais. A chave fica só neste aparelho.</p>
     <div class="row2"><div class="field"><label for="s-repo">Repositório (dono/nome)</label><input class="in" id="s-repo" value="${esc(sy.repo)}" placeholder="seu-usuario/cerebro-notas"></div><div class="field"><label for="s-branch">Ramo</label><input class="in" id="s-branch" value="${esc(sy.branch)}"></div></div>
     <div class="field"><label for="s-token">Chave de acesso (token)</label><input class="in mono" id="s-token" type="password" value="${esc(sy.token)}" placeholder="github_pat_..." autocomplete="off"></div>
+    <div class="cfgrow"><span class="lbl">Sincronizar sozinho (ao abrir, ao voltar ao app e uns 20 segundos depois de editar)</span><div class="seg wrap"><button class="${c.auto ? 'on' : ''}" data-act="cfg" data-k="auto" data-v="1">Ligado</button><button class="${!c.auto ? 'on' : ''}" data-act="cfg" data-k="auto" data-v="0">Desligado</button></div></div>
     <div class="chips"><button class="btn pri" data-act="sync">${ic('sync', 16)} Sincronizar agora</button></div><p class="hint" id="syncmsg" style="margin-top:10px">${esc(S.syncMsg || (sy.ultima ? 'Última sincronização: ' + fmtD(sy.ultima) : 'Ainda não sincronizado.'))}</p></div></section>
     <section class="sec"><h3>Zona de risco</h3><button class="btn dng" data-act="reset">Apagar tudo e recomeçar</button></section>`;
 }
@@ -519,21 +521,40 @@ function mergeDB(L, R) {
 }
 const b64 = s => btoa(unescape(encodeURIComponent(s)));
 const unb64 = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ''))));
-async function sincronizar() {
-  const sy = DB.cfg.sync; sy.repo = $('#s-repo').value.trim(); sy.branch = $('#s-branch').value.trim() || 'main'; sy.token = $('#s-token').value.trim(); save();
-  const say = m => { S.syncMsg = m; const e = $('#syncmsg'); if (e) e.textContent = m; };
-  if (!/^[\w.-]+\/[\w.-]+$/.test(sy.repo) || !sy.token) { say('Preencha o repositório (dono/nome) e a chave.'); return; }
+const horaAgora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const assinatura = () => JSON.stringify([DB.notas, DB.catalogo, DB.temas]).length;
+let autoT = 0;
+function agendarSync(ms = 20000) {
+  if (!DB || !DB.cfg.auto || S.busy) return;
+  const sy = DB.cfg.sync; if (!sy.repo || !sy.token || !navigator.onLine) return;
+  clearTimeout(autoT); autoT = setTimeout(() => sincronizar(true), ms);
+}
+async function sincronizar(auto) {
+  if (S.busy) return;
+  const sy = DB.cfg.sync;
+  if (!auto) { const g = id => { const e = $('#' + id); return e ? e.value.trim() : null; }, r = g('s-repo'), b = g('s-branch'), t = g('s-token'); if (r !== null) sy.repo = r; if (b !== null) sy.branch = b || 'main'; if (t !== null) sy.token = t; save(); }
+  const say = m => { S.syncMsg = m; const e = $('#syncmsg'); if (e) e.textContent = m; const f = $('#sfstat'); if (f) f.textContent = m; };
+  if (!/^[\w.-]+\/[\w.-]+$/.test(sy.repo) || !sy.token) { if (!auto) say('Preencha o repositório (dono/nome) e a chave.'); return; }
   const url = `https://api.github.com/repos/${sy.repo}/contents/${sy.path}`, h = { Authorization: 'Bearer ' + sy.token, Accept: 'application/vnd.github+json' };
+  S.busy = true; clearTimeout(autoT);
   try {
-    say('Conectando…');
-    const r = await fetch(`${url}?ref=${encodeURIComponent(sy.branch)}`, { headers: h }); let sha;
-    if (r.status === 200) { const j = await r.json(); sha = j.sha; DB = Object.assign(mergeDB(DB, JSON.parse(unb64(j.content || ''))), { cfg: DB.cfg }); }
-    else if (r.status !== 404) throw new Error(r.status === 401 ? 'chave inválida ou sem permissão' : r.status === 403 ? 'chave sem permissão de escrita' : 'erro ' + r.status);
-    DB.cfg.sync.ultima = now(); save();
-    const p = await fetch(url, { method: 'PUT', headers: h, body: JSON.stringify({ message: 'Lume Guia: sincronização ' + now(), content: b64(JSON.stringify(Object.assign(semSegredos(), { cfg: undefined }))), branch: sy.branch, sha }) });
-    if (!p.ok) throw new Error(p.status === 404 ? 'repositório não encontrado' : p.status === 409 || p.status === 422 ? 'conflito, tente de novo' : 'erro ao enviar ' + p.status);
-    ncache.clear(); tcache.clear(); say('Sincronizado: ' + fmtD(now())); render();
-  } catch (e) { say('Não sincronizou: ' + (e.message || e)); }
+    say(auto ? 'Sincronizando…' : 'Conectando…');
+    const antes = assinatura(); let ok = false;
+    for (let tent = 0; tent < 2 && !ok; tent++) {
+      const r = await fetch(`${url}?ref=${encodeURIComponent(sy.branch)}`, { headers: h }); let sha;
+      if (r.status === 200) { const j = await r.json(); sha = j.sha; DB = Object.assign(mergeDB(DB, JSON.parse(unb64(j.content || ''))), { cfg: DB.cfg }); }
+      else if (r.status !== 404) throw new Error(r.status === 401 ? 'chave inválida ou sem permissão' : r.status === 403 ? 'chave sem permissão de escrita' : 'erro ' + r.status);
+      const p = await fetch(url, { method: 'PUT', headers: h, body: JSON.stringify({ message: 'Lume Guia: sincronização ' + now(), content: b64(JSON.stringify(Object.assign(semSegredos(), { cfg: undefined }))), branch: sy.branch, sha }) });
+      if (p.ok) { ok = true; break; }
+      if ((p.status === 409 || p.status === 422) && tent === 0) continue;
+      throw new Error(p.status === 404 ? 'repositório não encontrado' : p.status === 409 || p.status === 422 ? 'conflito, tente de novo' : 'erro ao enviar ' + p.status);
+    }
+    DB.cfg.sync.ultima = now(); save(); S.ult = Date.now();
+    const mudou = assinatura() !== antes;
+    ncache.clear(); tcache.clear(); say('Sincronizado às ' + horaAgora());
+    if (!auto || mudou) { const ocupado = $('#modal').innerHTML.trim() || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || ''); if (auto && ocupado) S.pendRender = true; else render(); }
+  } catch (e) { say('Não sincronizou: ' + (e.message || e)); if (auto) setTimeout(() => agendarSync(0), 120000); }
+  finally { S.busy = false; }
 }
 async function lerEnex(files) {
   let add = 0;
@@ -596,7 +617,7 @@ const ACT = {
   paleta: d => { DB.cfg.paleta = +d.v; save(); aplicar(); render(); },
   exclaude: d => { baixar('lume-guia-para-claude.md', paraClaude(d.v === '1'), 'text/markdown'); toast('Arquivo gerado'); },
   backup: () => { baixar('lume-guia-backup-' + now().slice(0, 10) + '.json', JSON.stringify(semSegredos()), 'application/json'); },
-  sync: () => sincronizar(),
+  sync: () => sincronizar(false),
   reset: () => modal(`<h2>Apagar tudo?</h2><p>Apaga as notas e o catálogo deste aparelho e volta ao conteúdo importado do Evernote. Baixe um backup antes.</p><div class="mfoot"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="reset2">Apagar e recomeçar</button></div>`),
   reset2: () => { localStorage.removeItem(KEY); location.reload(); }
 };
@@ -642,7 +663,8 @@ document.addEventListener('submit', e => {
     DB.temas = l; DB.ts.temas = now(); tcache.clear(); save(); fechar(); toast('Temas salvos'); render();
   }
 });
-window.addEventListener('online', render); window.addEventListener('offline', render);
+window.addEventListener('online', () => { render(); agendarSync(1500); }); window.addEventListener('offline', render);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && DB && Date.now() - (S.ult || 0) > 60000) agendarSync(1500); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
 boot();
 })();
